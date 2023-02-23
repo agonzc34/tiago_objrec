@@ -8,7 +8,7 @@ import time
 
 from std_msgs.msg import Int8
 from sensor_msgs.msg import Image
-from yolo_interfaces.msg import BoundingBoxes, BoundingBox
+from yolo_msgs.msg import BoundingBoxes, BoundingBox
 
 cfg_files_path = "./src/foxy_yolo/net_props/"
 
