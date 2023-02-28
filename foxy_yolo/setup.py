@@ -1,4 +1,5 @@
 from setuptools import setup
+import glob
 
 package_name = 'foxy_yolo'
 
@@ -10,6 +11,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/net_props', glob.glob('net_props/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

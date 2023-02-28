@@ -5,12 +5,15 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 import time
+import ament_index_python.packages
+import os
+from PIL import Image as PILImage
 
 from std_msgs.msg import Int8
 from sensor_msgs.msg import Image
 from yolo_msgs.msg import BoundingBoxes, BoundingBox
 
-cfg_files_path = "./src/foxy_yolo/net_props/"
+cfg_files_path = os.path.join(ament_index_python.packages.get_package_share_directory('foxy_yolo'), 'net_props/')
 
 class YoloPublisher(Node):
 
@@ -22,13 +25,13 @@ class YoloPublisher(Node):
 
         self.camera_read_sub_ = self.create_subscription(Image, "/head_front_camera/depth_registered/image_raw", self.camera_read_callback, 10)
 
-        self.net = cv.dnn.readNet(cfg_files_path + "yolov3-tiny.weights", cfg_files_path + "yolov3-tiny.cfg")
+        self.net = cv.dnn.readNet(cfg_files_path + "yolo.weights", cfg_files_path + "yolo.cfg", "Darknet")
         self.classes = []
         with open(cfg_files_path + "classes.names", "r") as f:
             self.classes = [line.strip() for line in f.readlines()]
         
         self.layer_names = self.net.getLayerNames()
-        self.output_layers = [self.layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()]
+        self.output_layers = [self.layer_names[i - 1] for i in self.net.getUnconnectedOutLayers()]
         self.colors = np.random.uniform(0, 255, size=(len(self.classes), 3))
         self.frame_id = 0
         self.font = cv.FONT_HERSHEY_PLAIN
@@ -46,7 +49,8 @@ class YoloPublisher(Node):
         bounding_boxes.bounding_boxes = []
 
         cv_image = self.convert_image(image)
-        height, width, channels = cv_image.shape
+        height = image.height
+        width = image.width
         self.frame_id += 1
 
         blob = cv.dnn.blobFromImage(cv_image, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
@@ -107,10 +111,19 @@ class YoloPublisher(Node):
 
     def convert_image(self, ros_image, encoding="passthrough"):
         np_arr = np.frombuffer(ros_image.data, np.uint8)
-        image_np = cv.imdecode(np_arr, cv.IMREAD_COLOR)
-        if encoding != "passthrough":
-            image_np = cv.cvtColor(image_np, cv.COLOR_BGR2RGB)
-        return image_np
+
+        image_pil = PILImage.frombuffer("RGBA", (ros_image.width, ros_image.height), np_arr, "raw", "RGBA", 0, 1)
+
+        np_image_pil = np.array(image_pil)
+
+        print(np_image_pil)
+
+        open_cv_image = np_image_pil[:, :, ::-1].copy()
+
+        cv.imshow("Image", open_cv_image)
+        cv.waitKey(0)
+
+        return open_cv_image
 
 def main(args=None):
     rclpy.init(args=args)
