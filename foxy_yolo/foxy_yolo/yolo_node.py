@@ -37,6 +37,8 @@ class YoloPublisher(Node):
         self.font = cv.FONT_HERSHEY_PLAIN
         self.starting_time = time.time()
 
+        self.capture = cv.VideoCapture(0)
+
     
     def camera_read_callback(self, image):
         counted_objects = Int8()
@@ -45,19 +47,25 @@ class YoloPublisher(Node):
 
         bounding_boxes.header.frame_id = str(self.frame_id)
         bounding_boxes.header.stamp = self.get_clock().now().to_msg()
-        bounding_boxes.image_header = image.header
+        # bounding_boxes.image_header = image.header
         bounding_boxes.bounding_boxes = []
 
-        bridge = CvBridge()
-        cv_image = bridge.imgmsg_to_cv2(image)
 
-        height = image.height
-        width = image.width
+        ret, frame = self.capture.read()
+
+        cv_image = frame
+
+        bridge = CvBridge()
+
+        height, width, channels = cv_image.shape
         self.frame_id += 1
 
         blob = cv.dnn.blobFromImage(cv_image, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
         self.net.setInput(blob)
         outs = self.net.forward(self.output_layers)
+
+        if self.frame_id == 3:
+            print('outs', outs)
 
         class_ids = []
         confidences = []
@@ -67,12 +75,12 @@ class YoloPublisher(Node):
                 scores = detection[5:]
                 class_id = np.argmax(scores)
                 confidence = scores[class_id]
-                if confidence > 0.5:
+                if confidence > 0.2:
                     # Object detected
                     center_x = int(detection[0] * width)
                     center_y = int(detection[1] * height)
-                    w = int(detection[2] * width)
-                    h = int(detection[3] * height)
+                    w = int(detection[2] * 416)
+                    h = int(detection[3] * 416)
 
                     # Rectangle coordinates
                     x = int(center_x - w / 2)
@@ -107,7 +115,7 @@ class YoloPublisher(Node):
 
         cv.namedWindow("Image", cv.WINDOW_NORMAL)
         cv.imshow("Image", cv_image)
-        cv.waitKey(0)
+        cv.waitKey(1)
         
         output_image = bridge.cv2_to_imgmsg(cv_image, encoding="passthrough")
 
@@ -115,12 +123,14 @@ class YoloPublisher(Node):
         self.detection_image_pub_.publish(output_image)
         self.bounding_boxes_pub_.publish(bounding_boxes)
 
+
 def main(args=None):
     rclpy.init(args=args)
 
     yolo_publisher = YoloPublisher()
 
-    rclpy.spin(yolo_publisher)
+    while True:
+        YoloPublisher.camera_read_callback(yolo_publisher, Image())
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
