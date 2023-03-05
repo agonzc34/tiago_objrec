@@ -7,7 +7,7 @@ from rclpy.node import Node
 import time
 import ament_index_python.packages
 import os
-from PIL import Image as PILImage
+from cv_bridge import CvBridge
 
 from std_msgs.msg import Int8
 from sensor_msgs.msg import Image
@@ -19,11 +19,11 @@ class YoloPublisher(Node):
 
     def __init__(self):
         super().__init__('yolo_node')
-        self.detection_image_pub_ = self.create_publisher(Image, 'detection_image', 10)
-        self.counted_objects_pub_ = self.create_publisher(Int8, "objects_counted", 10)
-        self.bounding_boxes_pub_ = self.create_publisher(BoundingBoxes, "bounding_boxes", 10)
+        self.detection_image_pub_ = self.create_publisher(Image, 'obj_rec_detection_image', 10)
+        self.counted_objects_pub_ = self.create_publisher(Int8, "obj_rec_objects_counted", 10)
+        self.bounding_boxes_pub_ = self.create_publisher(BoundingBoxes, "obj_rec_bounding_boxes", 10)
 
-        self.camera_read_sub_ = self.create_subscription(Image, "/head_front_camera/depth_registered/image_raw", self.camera_read_callback, 10)
+        self.camera_read_sub_ = self.create_subscription(Image, "/head_front_camera/rgb/image_raw", self.camera_read_callback, 10)
 
         self.net = cv.dnn.readNet(cfg_files_path + "yolo.weights", cfg_files_path + "yolo.cfg", "Darknet")
         self.classes = []
@@ -48,7 +48,9 @@ class YoloPublisher(Node):
         bounding_boxes.image_header = image.header
         bounding_boxes.bounding_boxes = []
 
-        cv_image = self.convert_image(image)
+        bridge = CvBridge()
+        cv_image = bridge.imgmsg_to_cv2(image)
+
         height = image.height
         width = image.width
         self.frame_id += 1
@@ -83,7 +85,7 @@ class YoloPublisher(Node):
                     bounding_box = BoundingBox()
 
                     bounding_box.class_name = self.classes[class_id]
-                    bounding_box.probability = confidence
+                    bounding_box.probability = float(confidence)
                     bounding_box.xmin = x
                     bounding_box.ymin = y
                     bounding_box.xmax = x + w
@@ -100,30 +102,18 @@ class YoloPublisher(Node):
                 color = self.colors[i]
                 cv.rectangle(cv_image, (x, y), (x + w, y + h), color, 2)
                 cv.putText(cv_image, label + " " + str(round(confidence, 2)), (x, y + 30), self.font, 3, color, 3)
-        
-        cv.imshow("Image", cv_image)
 
-        output_image = self.convert_image(cv_image, "bgr8")
+                print("Object detected: " + label + " " + str(round(confidence, 2)))
+
+        cv.namedWindow("Image", cv.WINDOW_NORMAL)
+        cv.imshow("Image", cv_image)
+        cv.waitKey(0)
+        
+        output_image = bridge.cv2_to_imgmsg(cv_image, encoding="passthrough")
 
         self.counted_objects_pub_.publish(counted_objects)
         self.detection_image_pub_.publish(output_image)
         self.bounding_boxes_pub_.publish(bounding_boxes)
-
-    def convert_image(self, ros_image, encoding="passthrough"):
-        np_arr = np.frombuffer(ros_image.data, np.uint8)
-
-        image_pil = PILImage.frombuffer("RGBA", (ros_image.width, ros_image.height), np_arr, "raw", "RGBA", 0, 1)
-
-        np_image_pil = np.array(image_pil)
-
-        print(np_image_pil)
-
-        open_cv_image = np_image_pil[:, :, ::-1].copy()
-
-        cv.imshow("Image", open_cv_image)
-        cv.waitKey(0)
-
-        return open_cv_image
 
 def main(args=None):
     rclpy.init(args=args)
