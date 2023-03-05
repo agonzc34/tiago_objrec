@@ -71,8 +71,8 @@ class YoloPublisher(Node):
                     # Object detected
                     center_x = int(detection[0] * width)
                     center_y = int(detection[1] * height)
-                    w = int(detection[2] * width)
-                    h = int(detection[3] * height)
+                    w = int(detection[2] * 416)
+                    h = int(detection[3] * 416)
 
                     # Rectangle coordinates
                     x = int(center_x - w / 2)
@@ -107,7 +107,7 @@ class YoloPublisher(Node):
 
         cv.namedWindow("Image", cv.WINDOW_NORMAL)
         cv.imshow("Image", cv_image)
-        cv.waitKey(0)
+        cv.waitKey(1)
         
         output_image = bridge.cv2_to_imgmsg(cv_image, encoding="passthrough")
 
