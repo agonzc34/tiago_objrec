@@ -8,6 +8,7 @@ import time
 import ament_index_python.packages
 import os
 from cv_bridge import CvBridge
+import rclpy.logging
 
 from std_msgs.msg import Int8
 from sensor_msgs.msg import Image
@@ -19,9 +20,9 @@ class YoloPublisher(Node):
 
     def __init__(self):
         super().__init__('yolo_node')
-        self.detection_image_pub_ = self.create_publisher(Image, 'obj_rec_detection_image', 10)
-        self.counted_objects_pub_ = self.create_publisher(Int8, "obj_rec_objects_counted", 10)
-        self.bounding_boxes_pub_ = self.create_publisher(BoundingBoxes, "obj_rec_bounding_boxes", 10)
+        self.detection_image_pub_ = self.create_publisher(Image, '/obj_rec/detection_image', 10)
+        self.counted_objects_pub_ = self.create_publisher(Int8, "/obj_rec/objects_counted", 10)
+        self.bounding_boxes_pub_ = self.create_publisher(BoundingBoxes, "/obj_rec/bounding_boxes", 10)
 
         self.camera_read_sub_ = self.create_subscription(Image, "/head_front_camera/rgb/image_raw", self.camera_read_callback, 10)
 
@@ -101,6 +102,9 @@ class YoloPublisher(Node):
 
                     bounding_boxes.bounding_boxes.append(bounding_box)
         
+        if counted_objects.data > 0:
+            self.get_logger().info("Frame", self.frame_id, " Objects counted: " + str(counted_objects.data))
+
         indexes = cv.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
         for i in range(len(boxes)):
             if i in indexes:
@@ -111,7 +115,7 @@ class YoloPublisher(Node):
                 cv.rectangle(cv_image, (x, y), (x + w, y + h), color, 2)
                 cv.putText(cv_image, label + " " + str(round(confidence, 2)), (x, y + 30), self.font, 3, color, 3)
 
-                print("Object detected: " + label + " " + str(round(confidence, 2)))
+                self.get_logger().info("Object detected: " + label + " " + str(round(confidence, 2)))
 
         cv.namedWindow("Image", cv.WINDOW_NORMAL)
         cv.imshow("Image", cv_image)
