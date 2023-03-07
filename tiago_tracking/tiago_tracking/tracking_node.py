@@ -13,18 +13,16 @@ from sensor_msgs.msg import Image
 from yolo_msgs.msg import BoundingBoxes, BoundingBox
 
 
-class TrackingPublisher(Node):
+class TrackingNode(Node):
 
     def __init__(self):
         super().__init__('tracking_node')
         
-        self.image_sub_ = self.create_subscription(Image, "/head_front_camera/rgb/image_raw", self.camera_read_callback, 10)
-        self.bounding_boxes_pub_ = self.create_publisher(BoundingBoxes, "/obj_rec/bounding_boxes", 10)
+        self.image_sub_ = Subscriber(self, "/head_front_camera/rgb/image_raw", Image)
+        self.bounding_boxes_sub_ = Subscriber(self, "/obj_rec/bounding_boxes", BoundingBoxes)
 
-        self.init_tracking_sub_synchronizer = ApproximateTimeSynchronizer([self.image_sub_, self.bounding_boxes_pub_], 10, 0.3)
+        self.init_tracking_sub_synchronizer = ApproximateTimeSynchronizer([self.image_sub_, self.bounding_boxes_sub_], 10, 0.3)
         self.init_tracking_sub_synchronizer.registerCallback(self.init_track_callback)
-
-        self.tracking_sub_ = self.create_subscription(Image, "/head_front_camera/rgb/image_raw", None, 10)
 
         self.tracker = cv.TrackerCSRT_create()
 
@@ -50,7 +48,7 @@ class TrackingPublisher(Node):
                 self.init_tracker = self.tracker.init(cv_image, (x, y, w, h))
 
                 self.init_tracking_sub_synchronizer.unregisterCallback(self.init_track_callback)
-                self.tracking_sub_.register_callback(self.track_callback)
+                self.image_sub_.register_callback(self.track_callback)
 
                 
                     
@@ -72,14 +70,14 @@ class TrackingPublisher(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    yolo_publisher = TrackingPublisher()
+    tracking_node = TrackingNode()
 
-    rclpy.spin(yolo_publisher)
+    rclpy.spin(tracking_node)
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    yolo_publisher.destroy_node()
+    tracking_node.destroy_node()
     rclpy.shutdown()
 
 

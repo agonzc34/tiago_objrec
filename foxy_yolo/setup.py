@@ -22,7 +22,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'yolo_node = foxy_yolo.yolo_node:main'
+            'yolo_node = foxy_yolo.yolo_node:main',
+            'webcam_node = foxy_yolo.webcam_node:main'
         ],
     },
 )

@@ -38,7 +38,7 @@ class YoloPublisher(Node):
         self.font = cv.FONT_HERSHEY_PLAIN
         self.starting_time = time.time()
 
-        self.capture = cv.VideoCapture(0)
+        self.cv_bridge = CvBridge()
 
     
     def camera_read_callback(self, image):
@@ -48,13 +48,11 @@ class YoloPublisher(Node):
 
         bounding_boxes.header.frame_id = str(self.frame_id)
         bounding_boxes.header.stamp = self.get_clock().now().to_msg()
-        # bounding_boxes.image_header = image.header
+        bounding_boxes.image_header = image.header
         bounding_boxes.bounding_boxes = []
 
 
-        ret, frame = self.capture.read()
-
-        cv_image = frame
+        cv_image = self.cv_bridge.imgmsg_to_cv2(image)
 
         bridge = CvBridge()
 
@@ -64,9 +62,6 @@ class YoloPublisher(Node):
         blob = cv.dnn.blobFromImage(cv_image, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
         self.net.setInput(blob)
         outs = self.net.forward(self.output_layers)
-
-        if self.frame_id == 3:
-            print('outs', outs)
 
         class_ids = []
         confidences = []
@@ -103,7 +98,7 @@ class YoloPublisher(Node):
                     bounding_boxes.bounding_boxes.append(bounding_box)
         
         if counted_objects.data > 0:
-            self.get_logger().info("Frame", self.frame_id, " Objects counted: " + str(counted_objects.data))
+            self.get_logger().info(str.format("Frame {}. Objects counted: {}", self.frame_id, str(counted_objects.data)))
 
         indexes = cv.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
         for i in range(len(boxes)):
@@ -121,7 +116,7 @@ class YoloPublisher(Node):
         cv.imshow("Image", cv_image)
         cv.waitKey(1)
         
-        output_image = bridge.cv2_to_imgmsg(cv_image, encoding="passthrough")
+        output_image = bridge.cv2_to_imgmsg(cv_image)
 
         self.counted_objects_pub_.publish(counted_objects)
         self.detection_image_pub_.publish(output_image)
@@ -133,8 +128,7 @@ def main(args=None):
 
     yolo_publisher = YoloPublisher()
 
-    while True:
-        YoloPublisher.camera_read_callback(yolo_publisher, Image())
+    rclpy.spin(yolo_publisher)
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
