@@ -7,6 +7,7 @@ import rclpy
 from rclpy.node import Node
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 import rclpy.logging
+import sys
 
 
 from sensor_msgs.msg import Image
@@ -18,13 +19,13 @@ class TrackingNode(Node):
     def __init__(self):
         super().__init__('tracking_node')
         
-        self.image_sub_ = Subscriber(self, "/head_front_camera/rgb/image_raw", Image)
-        self.bounding_boxes_sub_ = Subscriber(self, "/obj_rec/bounding_boxes", BoundingBoxes)
+        self.image_sub_ = Subscriber(self, Image, "/head_front_camera/rgb/image_raw")
+        self.bounding_boxes_sub_ = Subscriber(self, BoundingBoxes, "/obj_rec/bounding_boxes")
 
-        self.init_tracking_sub_synchronizer = ApproximateTimeSynchronizer([self.image_sub_, self.bounding_boxes_sub_], 10, 0.3)
+        self.init_tracking_sub_synchronizer = ApproximateTimeSynchronizer([self.image_sub_, self.bounding_boxes_sub_], 10, 1)
         self.init_tracking_sub_synchronizer.registerCallback(self.init_track_callback)
 
-        self.tracker = cv.TrackerCSRT_create()
+        self.tracker = cv.TrackerKCF_create()
 
         self.cv_bridge = cv_bridge.CvBridge()
 
@@ -33,7 +34,7 @@ class TrackingNode(Node):
     
     def init_track_callback(self, image: Image, bounding_boxes: BoundingBoxes):
         for bounding_box in bounding_boxes.bounding_boxes:
-            if bounding_box.id == 1:
+            if bounding_box.id == 0:
                 rclpy.logging.get_logger('TrackingPublisher').info('Found a person!')
 
                 cv_image = self.cv_bridge.imgmsg_to_cv2(image)
@@ -68,6 +69,9 @@ class TrackingNode(Node):
 
 
 def main(args=None):
+    print("OpenCV version: ", cv.__version__)
+    print("Python environment: ", sys.executable)
+
     rclpy.init(args=args)
 
     tracking_node = TrackingNode()

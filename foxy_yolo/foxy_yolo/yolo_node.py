@@ -110,7 +110,7 @@ class YoloPublisher(Node):
                 cv.rectangle(cv_image, (x, y), (x + w, y + h), color, 2)
                 cv.putText(cv_image, label + " " + str(round(confidence, 2)), (x, y + 30), self.font, 3, color, 3)
 
-                self.get_logger().info("Object detected: " + label + " " + str(round(confidence, 2)))
+                self.get_logger().info("Object detected: " + label + ", id: " + str(class_id) + ", confidence: " + str(round(confidence, 2)))
 
         cv.namedWindow("Image", cv.WINDOW_NORMAL)
         cv.imshow("Image", cv_image)
